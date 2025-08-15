@@ -115,6 +115,20 @@
             <button id="toolPicker">Pipette</button>
           </div>
         </div>
+        <div class="field">
+          <h3>Additiv (RGB)</h3>
+          <div class="row"><span class="small">R</span><input id="addR" type="range" min="0" max="255" value="0" style="flex:1" /></div>
+          <div class="row"><span class="small">G</span><input id="addG" type="range" min="0" max="255" value="0" style="flex:1" /></div>
+          <div class="row"><span class="small">B</span><input id="addB" type="range" min="0" max="255" value="0" style="flex:1" /></div>
+          <div id="addPreview" class="swatch" style="width:100%;height:28px;margin-top:8px"></div>
+        </div>
+        <div class="field">
+          <h3>Subtraktiv (CMY)</h3>
+          <div class="row"><span class="small">C</span><input id="subC" type="range" min="0" max="100" value="0" style="flex:1" /></div>
+          <div class="row"><span class="small">M</span><input id="subM" type="range" min="0" max="100" value="0" style="flex:1" /></div>
+          <div class="row"><span class="small">Y</span><input id="subY" type="range" min="0" max="100" value="0" style="flex:1" /></div>
+          <div id="subPreview" class="swatch" style="width:100%;height:28px;margin-top:8px"></div>
+        </div>
       </div>
     </section>
 
@@ -357,6 +371,45 @@
       // 1..6 selects swatch
       const n = parseInt(e.key,10); if(n>=1 && n<=6){ selectedSwatch=n-1; activeColor={...swatches[selectedSwatch]}; drawSwatches(); }
     });
+
+    // Color model sliders
+    function additiveColor(){
+      const r = +document.getElementById('addR').value;
+      const g = +document.getElementById('addG').value;
+      const b = +document.getElementById('addB').value;
+      return { r, g, b, a: 255 };
+    }
+    function subtractiveColor(){
+      const c = +document.getElementById('subC').value / 100;
+      const m = +document.getElementById('subM').value / 100;
+      const y = +document.getElementById('subY').value / 100;
+      const r = Math.round(255 * (1 - c));
+      const g = Math.round(255 * (1 - m));
+      const b = Math.round(255 * (1 - y));
+      return { r, g, b, a: 255 };
+    }
+    function updateAdditive(){
+      const c = additiveColor();
+      document.getElementById('addPreview').style.background = `rgb(${c.r},${c.g},${c.b})`;
+      return c;
+    }
+    function updateSubtractive(){
+      const c = subtractiveColor();
+      document.getElementById('subPreview').style.background = `rgb(${c.r},${c.g},${c.b})`;
+      return c;
+    }
+    function onAddChange(){
+      const c = updateAdditive();
+      activeColor = c; selectedSwatch = -1; drawSwatches();
+    }
+    function onSubChange(){
+      const c = updateSubtractive();
+      activeColor = c; selectedSwatch = -1; drawSwatches();
+    }
+    ['addR','addG','addB'].forEach(id=>document.getElementById(id)?.addEventListener('input', onAddChange));
+    ['subC','subM','subY'].forEach(id=>document.getElementById(id)?.addEventListener('input', onSubChange));
+    updateAdditive();
+    updateSubtractive();
 
     // Init
     renderMatrix();
