@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LED‑Matrix Mockup 8×8 – Starter</title>
+  <style>
+    :root{
+      --cell: clamp(20px, 6vmin, 44px);
+      --gap: 6px;
+      --bg: #0b0b0b;
+      --ui: #1b1b1b;
+      --ui-2:#2a2a2a;
+      --text:#e7e7e7;
+      --muted:#9aa0a6;
+      --accent:#4da3ff;
+      --on:#00d084;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+      background:linear-gradient(180deg,#0b0b0b,#101214);
+      color:var(--text); display:flex; flex-direction:column; align-items:center;
+    }
+    header{width:min(1200px,100%); padding:16px 20px; display:flex; justify-content:space-between; align-items:center}
+    header h1{font-size:18px; margin:0; font-weight:600}
+    header .right{display:flex; gap:8px; align-items:center}
+    button,select,input[type="color"],input[type="range"]{background:var(--ui); color:var(--text); border:1px solid #333; border-radius:10px; padding:8px 10px}
+    button{cursor:pointer}
+    button.primary{background:var(--accent); border-color:var(--accent); color:#08111f}
+    button.ghost{background:transparent; border-color:#333}
+    .wrap{width:min(1200px,100%); padding:0 20px 32px; display:grid; grid-template-columns: 1fr 460px; gap:20px}
+
+    /* Left: Matrix + Sequence */
+    .surface{background:#0f1113; border:1px solid #222; border-radius:14px; padding:16px; box-shadow:0 6px 30px rgba(0,0,0,.35)}
+    .matrix{display:grid; grid-template-columns: repeat(8, var(--cell)); grid-auto-rows:var(--cell); gap:var(--gap); justify-content:center; padding:12px}
+    .px{width:var(--cell); height:var(--cell); background:#111; border:1px solid #222; border-radius:6px; box-shadow:inset 0 0 0 1px #0006}
+    .px[data-on="1"]{outline:2px solid #fff2}
+
+    .panel{display:flex; gap:12px; flex-wrap:wrap; padding:8px}
+    .field{background:var(--ui); border:1px solid #2e2e2e; border-radius:12px; padding:12px; min-width:180px}
+    .field h3{margin:0 0 10px; font-size:13px; color:var(--muted); letter-spacing:.3px; font-weight:600}
+
+    .swatches{display:grid; grid-template-columns:repeat(6, 28px); gap:8px}
+    .swatch{width:28px; height:28px; border-radius:6px; border:1px solid #0008; cursor:pointer}
+    .swatch.active{outline:2px solid #fff8}
+
+    .modes{display:flex; gap:8px}
+    .small{font-size:12px; color:var(--muted)}
+
+    /* Right: Tools */
+    .sidebar{display:flex; flex-direction:column; gap:16px}
+    .stack{background:#0f1113; border:1px solid #222; border-radius:14px; padding:16px}
+    .row{display:flex; align-items:center; gap:8px}
+
+    .mem-grid{display:grid; grid-template-columns:repeat(4, 1fr); gap:8px}
+    .slot{aspect-ratio:1; border-radius:10px; border:1px dashed #3a3a3a; position:relative; background:#0b0d0f; cursor:pointer}
+    .slot.selected{border:1px solid var(--accent); box-shadow:0 0 0 2px #4da3ff55}
+    .slot>canvas{position:absolute; inset:8px; width:calc(100% - 16px); height:calc(100% - 16px); background:#111; border-radius:6px}
+
+    .seq{display:flex; align-items:center; gap:8px}
+    .seq input[type="range"]{width:100%}
+    .status{font-size:12px; color:var(--muted)}
+
+    .kbd{display:grid; grid-template-columns:repeat(4,1fr); gap:8px}
+    .kbd .key{padding:10px; text-align:center; border-radius:10px; border:1px solid #333; background:var(--ui)}
+
+    .note{font-size:12px; color:var(--muted)}
+
+    @media (max-width: 980px){
+      .wrap{grid-template-columns: 1fr}
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>LED‑Matrix / Swatrix – HTML Starter</h1>
+    <div class="right">
+      <button id="btnClear" class="ghost" title="Matrix leeren">Leeren</button>
+      <button id="btnFullscreen" class="ghost" title="Fullscreen">Fullscreen</button>
+      <button id="btnExport" class="primary" title="JSON exportieren">Export</button>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <!-- LEFT: Matrix + Controls under -->
+    <section class="surface">
+      <div id="matrix" class="matrix" aria-label="8×8‑Matrix"></div>
+
+      <div class="panel">
+        <div class="field" style="min-width:220px">
+          <h3>Farbwahl</h3>
+          <div class="swatches" id="swatches"></div>
+          <div class="row small" style="margin-top:10px">
+            <input id="colorPicker" type="color" value="#ff3b3b" title="Custom" />
+            <button id="addSwatch">Swatch hinzufügen</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <h3>Modus</h3>
+          <div class="modes">
+            <button id="modeAssign" class="primary">Zuweisen</button>
+            <button id="modeAdjust">Anpassen</button>
+          </div>
+          <p class="small" style="margin-top:8px">Zuweisen: Klick setzt ausgewählte Farbe. Anpassen: Mausrad/Hoch‑Runter verändert Helligkeit/Kanal.</p>
+        </div>
+
+        <div class="field">
+          <h3>Werkzeug</h3>
+          <div class="row">
+            <button id="toolPaint" class="primary">Pinsel</button>
+            <button id="toolFill">Füllen</button>
+            <button id="toolPicker">Pipette</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT: Sidebar with Memory + Sequence + KBD legend placeholder -->
+    <aside class="sidebar">
+      <div class="stack">
+        <h3 style="margin:0 0 10px; color:var(--muted)">Speicher (16 Slots)</h3>
+        <div class="mem-grid" id="memGrid"></div>
+        <div class="row" style="margin-top:10px">
+          <button id="btnSaveSlot" class="primary">In Slot speichern</button>
+          <button id="btnLoadSlot" class="ghost">Aus Slot laden</button>
+        </div>
+      </div>
+
+      <div class="stack">
+        <h3 style="margin:0 0 8px; color:var(--muted)">Sequenz</h3>
+        <div class="seq">
+          <button id="seqStart" class="primary">Start</button>
+          <button id="seqStop" class="ghost">Stop</button>
+          <input id="seqSpeed" type="range" min="2" max="20" value="8" />
+        </div>
+        <p class="status" id="seqStatus">Bereit</p>
+        <p class="note">Es werden nur Slots abgespielt, die Inhalt haben.</p>
+      </div>
+
+      <div class="stack">
+        <h3 style="margin:0 0 8px; color:var(--muted)">Tastatur</h3>
+        <div class="kbd">
+          <div class="key">1–6<br><span class="small">Swatch wählen</span></div>
+          <div class="key">S<br><span class="small">Speichern</span></div>
+          <div class="key">L<br><span class="small">Laden</span></div>
+          <div class="key">Space<br><span class="small">Play/Stop</span></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    // --- State ---
+    const GRID = 8;
+    const matrix = Array.from({ length: GRID * GRID }, () => ({ r: 0, g: 0, b: 0, a: 255 }));
+    let mode = "assign"; // assign | adjust
+    let tool = "paint"; // paint | fill | picker
+    let activeColor = { r: 255, g: 59, b: 59, a: 255 };
+    const swatches = [
+      { r:255,g:59,b:59,a:255 }, { r:255,g:149,b:0,a:255 }, { r:255,g:214,b:10,a:255 },
+      { r:48,g:209,b:88,a:255 }, { r:10,g:132,b:255,a:255 }, { r:94,g:92,b:230,a:255 }
+    ];
+    let selectedSwatch = 0;
+    const memory = Array.from({ length: 16 }, () => null); // each slot: array of 64 px
+    let selectedSlot = 0;
+
+    // --- Helpers ---
+    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+    const idx = (x, y) => y * GRID + x;
+    function rgba(o){ return `rgba(${o.r},${o.g},${o.b},${(o.a/255).toFixed(3)})`; }
+    function copyMatrix(src){ return src.map(p => ({...p})); }
+
+    function renderMatrix(){
+      document.querySelectorAll('.px').forEach((el, i) => {
+        el.style.background = rgba(matrix[i]);
+        el.dataset.on = (matrix[i].r+matrix[i].g+matrix[i].b)>0 ? 1 : 0;
+      });
+      renderMemThumb(selectedSlot);
+    }
+
+    function renderMemThumb(slot){
+      const el = document.querySelectorAll('.slot')[slot];
+      const cnv = el.querySelector('canvas');
+      const ctx = cnv.getContext('2d');
+      ctx.clearRect(0,0,cnv.width,cnv.height);
+      const w = 8, h = 8; const s = Math.floor(cnv.width / w);
+      const data = memory[slot];
+      if(!data) return; 
+      for(let y=0;y<h;y++){
+        for(let x=0;x<w;x++){
+          const p = data[idx(x,y)];
+          ctx.fillStyle = `rgb(${p.r},${p.g},${p.b})`;
+          ctx.fillRect(x*s, y*s, s-1, s-1);
+        }
+      }
+    }
+
+    function toJSON(){ return JSON.stringify({ grid: GRID, pixels: matrix }, null, 2); }
+
+    function fromHex(hex){
+      const v = hex.replace('#','');
+      const r = parseInt(v.slice(0,2),16), g=parseInt(v.slice(2,4),16), b=parseInt(v.slice(4,6),16);
+      return { r, g, b, a: 255 };
+    }
+
+    function brighten(p, d){
+      return { r:clamp(p.r+d,0,255), g:clamp(p.g+d,0,255), b:clamp(p.b+d,0,255), a:p.a };
+    }
+
+    // --- Build UI ---
+    const mRoot = document.getElementById('matrix');
+    for(let i=0;i<GRID*GRID;i++){
+      const d=document.createElement('div'); d.className='px'; d.dataset.i=i;
+      d.addEventListener('pointerdown', onPaint);
+      d.addEventListener('wheel', onWheel, {passive:false});
+      mRoot.appendChild(d);
+    }
+
+    const swRoot = document.getElementById('swatches');
+    function drawSwatches(){
+      swRoot.innerHTML = '';
+      swatches.forEach((c, i)=>{
+        const s=document.createElement('button'); s.className='swatch'+(i===selectedSwatch?' active':'');
+        s.style.background = `rgb(${c.r},${c.g},${c.b})`;
+        s.title = `Swatch ${i+1}`; s.addEventListener('click',()=>{selectedSwatch=i; activeColor={...swatches[i]}; drawSwatches();});
+        swRoot.appendChild(s);
+      });
+    }
+    drawSwatches();
+
+    // Memory UI
+    const memGrid = document.getElementById('memGrid');
+    for(let i=0;i<16;i++){
+      const s=document.createElement('div'); s.className='slot'+(i===selectedSlot?' selected':'');
+      s.addEventListener('click',()=>{selectSlot(i);});
+      const c=document.createElement('canvas'); c.width=96; c.height=96; s.appendChild(c);
+      memGrid.appendChild(s);
+    }
+
+    function selectSlot(i){
+      document.querySelectorAll('.slot').forEach(el=>el.classList.remove('selected'));
+      selectedSlot = i;
+      document.querySelectorAll('.slot')[i].classList.add('selected');
+    }
+
+    // --- Events ---
+    function onPaint(e){
+      const i = +e.currentTarget.dataset.i;
+      if(tool === 'picker'){
+        activeColor = {...matrix[i]};
+        // set closest swatch visual
+        selectedSwatch = -1; drawSwatches();
+        return;
+      }
+      if(tool === 'fill'){
+        floodFill(i, activeColor);
+      } else {
+        if(mode==='assign') matrix[i] = {...activeColor};
+        else matrix[i] = brighten(matrix[i], e.shiftKey? -10: 10);
+      }
+      renderMatrix();
+    }
+
+    function onWheel(e){
+      if(mode!== 'adjust') return;
+      e.preventDefault();
+      const i = +e.currentTarget.dataset.i;
+      const delta = e.deltaY>0? -8: 8;
+      matrix[i] = brighten(matrix[i], delta);
+      renderMatrix();
+    }
+
+    function floodFill(start, color){
+      const target = matrix[start];
+      const eq=(a,b)=> a.r===b.r && a.g===b.g && a.b===b.b && a.a===b.a;
+      if(eq(target,color)) return;
+      const q=[start]; const seen=new Set([start]);
+      while(q.length){
+        const i=q.shift();
+        if(eq(matrix[i], target)){
+          matrix[i] = {...color};
+          const x=i%GRID, y=Math.floor(i/GRID);
+          const n=[[x-1,y],[x+1,y],[x,y-1],[x,y+1]].filter(([nx,ny])=> nx>=0&&nx<GRID&&ny>=0&&ny<GRID).map(([nx,ny])=> idx(nx,ny));
+          for(const ni of n){ if(!seen.has(ni)){ seen.add(ni); q.push(ni);} }
+        }
+      }
+    }
+
+    // Controls
+    document.getElementById('btnClear').onclick = ()=>{ matrix.forEach(p=>{p.r=p.g=p.b=0; p.a=255}); renderMatrix(); };
+    document.getElementById('btnFullscreen').onclick = ()=>{ if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); };
+    document.getElementById('btnExport').onclick = ()=>{
+      const blob = new Blob([toJSON()], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = Object.assign(document.createElement('a'), {href:url, download:'matrix.json'});
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    };
+
+    document.getElementById('modeAssign').onclick = ()=>{ mode='assign'; toggleMode(); };
+    document.getElementById('modeAdjust').onclick = ()=>{ mode='adjust'; toggleMode(); };
+    function toggleMode(){
+      document.getElementById('modeAssign').classList.toggle('primary', mode==='assign');
+      document.getElementById('modeAdjust').classList.toggle('primary', mode==='adjust');
+    }
+
+    document.getElementById('toolPaint').onclick = ()=> setTool('paint');
+    document.getElementById('toolFill').onclick = ()=> setTool('fill');
+    document.getElementById('toolPicker').onclick = ()=> setTool('picker');
+    function setTool(t){
+      tool=t;
+      ['toolPaint','toolFill','toolPicker'].forEach(id=>document.getElementById(id).classList.remove('primary'));
+      document.getElementById('tool'+t.charAt(0).toUpperCase()+t.slice(1)).classList.add('primary');
+    }
+
+    // Swatches
+    document.getElementById('addSwatch').onclick = ()=>{
+      const c = fromHex(document.getElementById('colorPicker').value);
+      swatches.unshift(c); if(swatches.length>12) swatches.pop(); selectedSwatch=0; activeColor={...c}; drawSwatches();
+    };
+
+    // Memory
+    document.getElementById('btnSaveSlot').onclick = ()=>{ memory[selectedSlot] = copyMatrix(matrix); renderMemThumb(selectedSlot); };
+    document.getElementById('btnLoadSlot').onclick = ()=>{ if(memory[selectedSlot]){ for(let i=0;i<matrix.length;i++) matrix[i]={...memory[selectedSlot][i]}; renderMatrix(); } };
+
+    // Sequence
+    let seqTimer=null; let seqIndex=0;
+    function slotsWithData(){ return memory.map((v,i)=> v? i:null).filter(v=> v!==null); }
+
+    function play(){
+      const slots = slotsWithData();
+      if(slots.length===0){ setStatus('Keine befüllten Slots.'); return; }
+      const speed = +document.getElementById('seqSpeed').value; // ticks per second
+      const interval = 1000 / speed;
+      setStatus(`Spiel: ${slots.length} Frames @ ${speed}/s`);
+      seqIndex = 0;
+      seqTimer = setInterval(()=>{
+        const current = slots[seqIndex % slots.length];
+        if(memory[current]){ for(let i=0;i<matrix.length;i++) matrix[i] = {...memory[current][i]}; renderMatrix(); }
+        seqIndex++;
+      }, interval);
+    }
+
+    function stop(){ if(seqTimer){ clearInterval(seqTimer); seqTimer=null; setStatus('Bereit'); } }
+    function setStatus(t){ document.getElementById('seqStatus').textContent = t; }
+
+    document.getElementById('seqStart').onclick = play;
+    document.getElementById('seqStop').onclick = stop;
+
+    // Hotkeys
+    window.addEventListener('keydown', (e)=>{
+      if(e.code==='Space'){ e.preventDefault(); if(seqTimer) stop(); else play(); }
+      if(e.key==='s' || e.key==='S') document.getElementById('btnSaveSlot').click();
+      if(e.key==='l' || e.key==='L') document.getElementById('btnLoadSlot').click();
+      // 1..6 selects swatch
+      const n = parseInt(e.key,10); if(n>=1 && n<=6){ selectedSwatch=n-1; activeColor={...swatches[selectedSwatch]}; drawSwatches(); }
+    });
+
+    // Init
+    renderMatrix();
+  </script>
+</body>
+</html>
